@@ -1,0 +1,20 @@
+# air（ホットリロードツール）の設定ファイル。
+# ファイルの変更を監視して、変更があれば build.cmd でビルドし、build.entrypoint を起動し直す。
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/server ./cmd/server"
+  entrypoint = ["./tmp/server"]
+  include_ext = ["go"]
+  exclude_dir = ["tmp", "migrations"]
+  exclude_regex = ["_test\\.go"]
+  delay = 500
+  # Docker Desktop（Mac/Windows）でファイル変更を検知できない場合は true にする
+  poll = false
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true

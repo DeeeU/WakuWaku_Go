@@ -1,0 +1,57 @@
+# docker compose up で、Goサーバー・PostgreSQL・Redis をまとめて起動する。
+# Railsでいうと「rails server」「PostgreSQL」「Redis」を別々に起動していた手間を1コマンドにしたもの。
+services:
+  # ---- Go の APIサーバー ----
+  server:
+    build: ./server
+    ports:
+      - "8080:8080" # ホスト(自分のPC)の8080 → コンテナの8080
+    environment:
+      PORT: "8080"
+      # ホスト名 "db" / "redis" は下のサービス名。compose 内ではサービス名で通信できる。
+      DATABASE_URL: postgres://wakuwaku:wakuwaku@db:5432/wakuwaku?sslmode=disable
+      REDIS_ADDR: redis:6379
+    volumes:
+      # 手元の server/ をコンテナにマウント → 保存すると air が検知して再起動する
+      - ./server:/app
+      # ダウンロードした Go ライブラリをキャッシュ（毎回ダウンロードし直さないため）
+      - go-mod-cache:/go/pkg/mod
+    depends_on:
+      # DB と Redis が「ヘルスチェックに合格してから」サーバーを起動する
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---- PostgreSQL ----
+  db:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432" # 手元の psql や TablePlus などからも接続できるように公開
+    environment:
+      POSTGRES_USER: wakuwaku
+      POSTGRES_PASSWORD: wakuwaku
+      POSTGRES_DB: wakuwaku
+    volumes:
+      - db-data:/var/lib/postgresql/data # コンテナを消してもデータが残るように
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wakuwaku -d wakuwaku"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # ---- Redis ----
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+# 名前付きボリューム（Dockerが管理する保存領域）
+volumes:
+  db-data:
+  go-mod-cache:
